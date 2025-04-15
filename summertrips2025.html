@@ -40,13 +40,13 @@
             // 2.2 Then initialize the first map
         var map = new mapboxgl.Map({
             container: 'map1', // id of a div on your page, where the map will be inserted
-            style: 'mapbox://styles/mapbox/streets-v11', // the style URL 'mapbox://styles/mapbox/streets-v11' 
+            style: 'mapbox://styles/mapbox/satellite-v9', // the style URL 'mapbox://styles/mapbox/streets-v11' 
             center: [-121.29802, 48.794440], // starting position [lng, lat] eg. [-122.6788, 45.5212]
             zoom: 8 // starting zoom 
         });
         var map2 = new mapboxgl.Map({
             container: 'map2', // id of a div on your page, where the map will be inserted
-            style: 'mapbox://styles/mapbox/streets-v11', // stylesheet location
+            style: 'mapbox://styles/mapbox/satellite-v9', // stylesheet location
             center: [-122.44444752374244, 37.78038780605262], // starting position [lng, lat] eg. [-122.6788, 45.5212]
             zoom: 11 // starting zoom 
         });
@@ -91,11 +91,11 @@
             
             var map3 = new mapboxgl.Map({
             container: 'map3', // id of a div on your page, where the map will be inserted
-            style: 'mapbox://styles/mapbox/streets-v11', // stylesheet location
+            style: 'mapbox://styles/mapbox/satellite-v9', // stylesheet location
             center: [-159.52573569028215, 22.064483401027964], // starting position [lng, lat] eg. [-122.6788, 45.5212]
             zoom: 9 // starting zoom 
         });
-var popup3 = new mapboxgl.Popup()
+            var popup3 = new mapboxgl.Popup()
          .setText('Kauai, Hawaii');
 
          var marker3 = new mapboxgl.Marker({color:'blue'})
@@ -117,6 +117,7 @@ var popup3 = new mapboxgl.Popup()
             // 2.6 Change the map pointers
 	       map.getCanvas().style.cursor = 'auto';
 	       map2.getCanvas().style.cursor = 'auto';
+            map3.getCanvas().style.cursor = 'auto'
         </script>
   </body>
 </html>
