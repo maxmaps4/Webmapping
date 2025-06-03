@@ -1,0 +1,856 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset='utf-8' />
+    <title>Great Lakes Shipwrecks</title>
+    <meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+    <!--    Include the reference to the Mapbox JavaScript here in the <head> of the page    -->
+        <script src='https://api.mapbox.com/mapbox-gl-js/v2.2.0/mapbox-gl.js'></script>
+    <!--    Include the reference to the Mapbox CSS here in the <head> of the page    -->
+      <link href='https://api.tiles.mapbox.com/mapbox-gl-js/v2.2.0/mapbox-gl.css' rel='stylesheet' />
+    <style>
+        /* Insert the CSS code here between the <style> tags */
+        body { margin:0; padding:0; }
+        #map { position:absolute; height:100%; width:100%; }
+
+        
+        .lake-button {
+    margin: 2px;
+    padding: 6px 10px;
+    background: #333;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+}
+.lake-button.active {
+    background: #00aced;
+}
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap');
+
+
+/* Use same popup base styles as before */
+.mapboxgl-popup {
+    max-width: 320px;
+    font-family: 'Inter', 'Arial', sans-serif;
+}
+
+.mapboxgl-popup-content {
+    background-color: #001f3f;
+    color: #00ffff;
+    font-size: 16px;
+    line-height: 1.5;
+    font-weight: 400;
+    border-radius: 10px;
+    padding: 12px 16px;
+    box-shadow: 0 0 12px #00ffff66;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+}
+
+/* Custom classes */
+.popup-title {
+    font-size: 18px;
+    font-weight: 600;
+    color: #00ffff;
+    text-align: center;
+}
+
+.popup-label {
+    color: #ccf;
+    font-size: 15px;
+    text-align: center;
+}
+
+.popup-image {
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    margin-top: 5px;
+}
+
+.mapboxgl-popup-tip {
+    border-top-color: #001f3f;
+}
+
+        /* Collapsible info panel styles */
+.info-panel {
+    position: absolute;
+    top: 30px;
+    left: 10px;
+    background: #001f3f;
+    color: #00ffff;
+    border-radius: 5px;
+    box-shadow: 0 0 12px #00ffff66;
+    max-width: 400px;
+}
+
+.info-header {
+    padding: 10px;
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #00ffff33;
+}
+
+.info-header:hover {
+    background: #002855;
+}
+
+.info-title {
+    font-size: 33px;
+    font-weight: bold;
+}
+
+.collapse-icon {
+    font-size: 16px;
+    transition: transform 0.3s ease;
+}
+
+.collapse-icon.expanded {
+    transform: rotate(180deg);
+}
+
+.info-content {
+    padding: 10px;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.info-content.collapsed {
+    max-height: 0;
+    padding: 0 10px;
+}
+
+.info-content.expanded {
+    max-height: 200px;
+}
+    </style>
+  </head>
+  <body>
+      <div id='map'></div>
+       <!--    legend of point colors(months)    -->
+      <div style="position: absolute; bottom: 200px; left: 10px; background: #001f3f; color: #00ffff; padding: 10px; border-radius: 5px; box-shadow: 0 0 12px #00ffff66;">
+        <strong>Month Sunk</strong><br>
+        Jan–Mar: <span style="color:#881dfa;">●</span><br>
+        Apr–Jun: <span style="color:#fa8c1d;">●</span><br>
+        Jul–Sep: <span style="color:#FF00FF;">●</span><br>
+        Oct–Dec: <span style="color:#7FFF00;">●</span><br>
+        Unknown: <span style="color:#f1f90c;">●</span>
+      </div>
+      <!--    filterable legend of years    -->
+      <div style="position: absolute; bottom: 110px; left: 10px; background: #001f3f; color: #00ffff; padding: 10px; border-radius: 5px; box-shadow: 0 0 12px #00ffff66;">
+          <strong>Filter by Year Sunk</strong><br>
+          <label id="year-label">1800</label><br>
+        <input id="slider" type="range" min="1800" max="1975" step="1" value="1975" style="width: 200px; height: 8px;">
+           </div>
+      <!--    filterable legend of lakes    -->
+<div style="position: absolute; bottom: 30px; left: 10px; background: #001f3f; color: #00ffff; padding: 10px; border-radius: 5px; box-shadow: 0 0 12px #00ffff66;">
+    <strong>Filter by Lake</strong><br>
+    <button class="lake-button" data-lake="All">All</button>
+    <button class="lake-button" data-lake="Lake Superior">Superior</button>
+    <button class="lake-button" data-lake="Lake Michigan">Michigan</button>
+    <button class="lake-button" data-lake="Lake Huron">Huron</button>
+    <button class="lake-button" data-lake="Lake Erie">Erie</button>
+    <button class="lake-button" data-lake="Lake Ontario">Ontario</button>
+</div>
+       <!--    legend of information    -->
+<div class="info-panel">
+    <div class="info-header" onclick="toggleInfoPanel()">
+        <strong class="info-title">Great Lakes Shipwrecks</strong>
+        <span class="collapse-icon expanded">▼</span>
+    </div>
+    <div class="info-content expanded" id="info-content">
+        This interactive map displays historical shipwrecks across the Great Lakes from 1800-1975. 
+        Use the filters below to explore wrecks by time period and specific lakes. 
+        Click on individual points to learn more about each vessel and view historical images where available.
+    </div>
+</div>
+
+
+    <script>
+        mapboxgl.accessToken = 'pk.eyJ1IjoibWF4MTA0IiwiYSI6ImNtYXUweDhrOTA2MGIyam14aTVyNGExOWUifQ.TaoNLhgBkpJRkQyTeJgCcg';
+        
+        var myMap = new mapboxgl.Map({
+            container: 'map', // id of a div on your page, where the map will be inserted
+            style: 'mapbox://styles/mapbox/dark-v11', // stylesheet location
+            center: [-84.8, 44.9], // starting position [lng, lat]
+            zoom: 6, // starting zoom 
+            minZoom: 5, // Minimum zoom level allowed
+            maxZoom: 10, // Maximum zoom level allowed
+            // Set max bounds: [southwestLngLat, northeastLngLat]
+            maxBounds: [
+            [-100, 40], // Southwest coordinates
+            [-70, 50]  // Northeast coordinates
+            ]
+        });
+        
+let selectedLake = "All";
+        
+    function toggleInfoPanel() {
+    const content = document.getElementById('info-content');
+    const icon = document.querySelector('.collapse-icon');
+    
+    if (content.classList.contains('expanded')) {
+        content.classList.remove('expanded');
+        content.classList.add('collapsed');
+        icon.classList.remove('expanded');
+    } else {
+        content.classList.remove('collapsed');
+        content.classList.add('expanded');
+        icon.classList.add('expanded');
+    }
+}
+ /// FILTER BY YEAR       
+function applyFilters() {
+    const year = parseInt(document.getElementById('slider').value, 10);
+    const yearFilter = ['all',
+        ['>=', ['get', 'Sunk year'], 1800], // Ensures year is >= 1800
+        ['<=', ['get', 'Sunk year'], year]  // Dynamic filter from slider
+    ];
+
+    if (selectedLake !== "All") {
+        yearFilter.push(['==', ['get', 'Lake'], selectedLake]);
+    }
+
+    // Apply to both layers
+    myMap.setFilter('Shipwrecks', yearFilter);
+    myMap.setFilter('Shipwrecks-glow', yearFilter);
+
+    document.getElementById('year-label').textContent = year;
+}
+
+        
+myMap.on('load', function() {
+    myMap.addSource('Sunk month', {
+        type: 'vector',
+        url: 'mapbox://max104.8302gfzd'
+    });
+
+// Add the glow/blur layer first (this goes underneath)
+myMap.addLayer({
+    id: 'Shipwrecks-glow',
+    type: "circle",
+    source: 'Sunk month',
+    'source-layer': 'shipwrecks-7oj4e7',
+    filter: ['>=', ['get', 'Sunk year'], 1800],  // Only show points with a sunk year
+    paint: {
+        'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            5, 12,  // Larger radius for glow effect
+            8, 22,
+            10, 32
+        ],
+        'circle-color': [
+            'match',
+            ['get', 'Sunk month'],
+            'January', '#881dfa',
+            'February', '#881dfa',
+            'March', '#881dfa',
+            'April', '#fa8c1d',
+            'May', '#fa8c1d',
+            'June', '#fa8c1d',
+            'July', '#FF00FF',
+            'August', '#FF00FF',
+            'September', '#FF00FF',
+            'October', '#7FFF00',
+            'November', '#7FFF00',
+            'December', '#7FFF00',
+            '#f1f90c' // default color
+        ],
+        'circle-opacity': 0.6,  // Lower opacity for glow effect
+        'circle-blur': 0.7       // Add blur for firefly glow
+    }
+});
+
+// Add the main circle layer on top
+myMap.addLayer({
+    id: 'Shipwrecks',
+    type: "circle",
+    source: 'Sunk month',
+    'source-layer': 'shipwrecks-7oj4e7',
+    filter: ['>=', ['get', 'Sunk year'], 1800],  // Only show points with a sunk year
+    paint: {
+        'circle-radius': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            5, 5,
+            8, 9,
+            10, 13
+        ],
+        'circle-color': [
+            'match',
+            ['get', 'Sunk month'],
+            'January', '#881dfa',
+            'February', '#881dfa',
+            'March', '#881dfa',
+            'April', '#fa8c1d',
+            'May', '#fa8c1d',
+            'June', '#fa8c1d',
+            'July', '#FF00FF',
+            'August', '#FF00FF',
+            'September', '#FF00FF',
+            'October', '#7FFF00',
+            'November', '#7FFF00',
+            'December', '#7FFF00',
+            '#f1f90c' // default color
+        ],
+        'circle-opacity': 0.8   // Slightly transparent main circle
+    }
+});
+    
+    
+// Great Lakes Name Labels
+myMap.addSource('great-lakes-labels-source', {
+    type: 'geojson',
+    data: {
+        type: 'FeatureCollection',
+        features: [
+            {   type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [-87.0, 47.8] // Lake Superior center
+                },
+                properties: {
+                    name: 'Lake Superior'
+                }},
+            {   type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [-86.8, 44.1] // Lake Michigan center
+                },
+                properties: {
+                    name: 'Lake Michigan'}
+            },
+            {   type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [-82.5, 45.55] // Lake Huron center
+                },
+                properties: {
+                    name: 'Lake Huron'
+                }     },
+            {
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [-81.12, 42.5] // Lake Erie center
+                },
+                properties: {
+                    name: 'Lake Erie'
+                }
+            },
+            {
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [-77.9, 43.7] // Lake Ontario center
+                },
+                properties: {
+                    name: 'Lake Ontario'
+                }} ] }
+});
+
+myMap.addLayer({
+    id: 'great-lakes-labels',
+    type: 'symbol',
+    source: 'great-lakes-labels-source',
+    layout: {
+        'text-field': ['get', 'name'],
+        'text-size': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            4, 16,
+            6, 20,
+            8, 24,
+            10, 28
+        ],
+        'text-anchor': 'center',
+        'text-justify': 'center',
+        'text-letter-spacing': 0.2,
+        'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold']
+    },
+    paint: {
+        'text-color': '#03083e',
+        'text-halo-color': '#00ffff',
+        'text-halo-width': 1,
+        'text-halo-blur': 2,
+        'text-opacity': [
+            'interpolate',
+            ['linear'],
+            ['zoom'],
+            3, 0,
+            4, 0.7,
+            8, 1
+        ]
+    }
+});
+// 1. Define lake info for popups
+const lakeInfo = {
+    "Lake Superior": "Surface Area: 31,700 sq miles <br> Volume: 2,900 cu miles <br> Average Depth: 483 feet <br> Maximum Depth: 1,332 feet",
+    "Lake Michigan": "Surface Area: 22,300 sq miles <br> Volume: 1,180 cu miles <br> Average Depth: 279 feet <br> Maximum Depth: 932 feet",
+    "Lake Huron": "Surface Area: 23,000 sq miles <br> Volume: 849 cu miles <br> Average Depth: 195 feet <br> Maximum Depth: 750 feet",
+    "Lake Erie": "Surface Area: 9,910 sq miles <br> Volume: 116 cu miles <br> Average Depth: 62 feet <br> Maximum Depth: 210 feet",
+    "Lake Ontario": "Surface Area: 7,340 sq miles <br> Volume: 393 cu miles <br> Average Depth: 283 feet <br> Maximum Depth: 802 feet"
+};
+
+// 2. Add click event listener
+myMap.on('click', 'great-lakes-labels', (e) => {
+    const name = e.features[0].properties.name;
+    const coordinates = e.features[0].geometry.coordinates.slice();
+    const description = lakeInfo[name] || "No information available.";
+
+    new mapboxgl.Popup()
+        .setLngLat(coordinates)
+        .setHTML(`<div style="font-size: 13px; line-height: 1.4;">${description}</div>`)
+        .addTo(myMap);
+});
+
+// 3. Change cursor to pointer on hover
+myMap.on('mouseenter', 'great-lakes-labels', () => {
+    myMap.getCanvas().style.cursor = 'pointer';
+});
+myMap.on('mouseleave', 'great-lakes-labels', () => {
+    myMap.getCanvas().style.cursor = '';
+});
+    
+    
+    applyFilters(); // initial filter
+// Handle lake button clicks
+document.querySelectorAll('.lake-button').forEach(button => {
+    button.addEventListener('click', function () {
+        // Highlight the active button
+        document.querySelectorAll('.lake-button').forEach(btn => btn.classList.remove('active'));
+        this.classList.add('active');
+
+        // Update selected lake and reapply filters
+        selectedLake = this.getAttribute('data-lake');
+        applyFilters();
+    });
+});
+
+
+document.getElementById('slider').addEventListener('input', applyFilters);
+
+});
+            
+            // Add click event for popups
+            myMap.on('click', 'Shipwrecks', function (e) {
+                var coordinates = e.features[0].geometry.coordinates.slice();
+                var properties = e.features[0].properties;
+                
+                // Ensure that if the map is zoomed out such that multiple
+                // copies of the feature are visible, the popup appears
+                // over the copy being pointed to.
+                while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                    coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                }
+                
+                // Customize the popup content as needed
+var shipName = (properties["Ship"] || "").trim();
+var sunkYear = properties["Sunk year"] || 'Unknown';
+var sunkMonth = properties["Sunk month"] || 'Unknown';
+var popupContent = '';
+
+                //pop up displays for ships with photos
+if (shipName === "Edmund Fitzgerald") {
+    popupContent = `
+    <div style="max-width: 320px;">
+    <strong class="popup-title">${shipName}</strong><br>
+    <span >Year: ${sunkYear}</span><br>
+    <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://shipwreckmuseum.com/wp-content/uploads/2022/11/Fitzgerald-on-the-St-Marys-Credit-Photo-Robert-Campbell-.jpg" 
+                alt="Edmund Fitzgerald" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}
+  
+             else   if (shipName === "Scotiadoc") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://lakesuperiorcircletour.info/wp-content/uploads/2022/10/Str._Martin_Mullen_Pioneer_Steam_Ship_Co.__coaling_Houghton_Mich.-1-2048x1444.jpg" 
+                alt="Scotiadoc" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}
+      
+                else   if (shipName === "Gunilda") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://lakesuperiorcircletour.info/wp-content/uploads/2022/10/Gunilda_sinking_in_Lake_Superior_1911-via-Wikicommons.jpg" 
+                alt="Gunilda" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}           
+                
+            else   if (shipName === "Niagara") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://lakesuperiorcircletour.info/wp-content/uploads/2022/10/Niagara_underway-2048x1310.jpg" 
+                alt="Niagara" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}      
+          else   if (shipName === "SS Anna C. Minch") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://www.lakepedia.com/blog/wp-content/uploads/2015/05/anna-c-minch.jpg" 
+                alt="SS Anna C. Minch" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}     
+            else   if (shipName === "Lady Elgin") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://www.lakepedia.com/blog/wp-content/uploads/2015/05/lady-elgin.jpg" 
+                alt="Lady Elgin" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}      
+            else   if (shipName === "SS Daniel J. Morrell") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://us-data.org/mi/glm/image/d-j-morrell.gif" 
+                alt="SS Daniel J. Morrell" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}               
+            else   if (shipName === "Metamora") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://upload.wikimedia.org/wikipedia/commons/b/b0/Metamora_tug.jpg" 
+                alt="Metamora" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}                 
+            else   if (shipName === "SS Isaac M. Scott") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://upload.wikimedia.org/wikipedia/commons/3/36/Isaac_M._Scott2.jpg" 
+                alt="SS Isaac M. Scott" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}                  
+                
+              else   if (shipName === "HMS Speedy") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://alchetron.com/cdn/hms-speedy-1782-994600ba-b409-49ca-9925-f32f79bd3d3-resize-750.jpeg" 
+                alt="HMS Speedy" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}                  
+
+   else   if (shipName === "St. Peter") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://www.waynehistorians.org/Places/media/0760/org/St._Peter_(schooner).jpg" 
+                alt="St. Peter" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+} 
+   else   if (shipName === "James B. Colgate") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://modelshipworld.com/uploads/monthly_2020_11/4.jpg.7db65ec0ecf85dd2b6343bb9c6b35b41.jpg" 
+                alt="James B. Colgate" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}
+   else   if (shipName === "Admiral") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://inbetweentheline.com/wp-content/uploads/2025/05/the-admiral.png" 
+                alt="Admiral" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}
+   else   if (shipName === "PS Anthony Wayne") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://upload.wikimedia.org/wikipedia/commons/thumb/d/d5/Anthony_Wayne_-_J.W._Orr_lithograph.jpg/1280px-Anthony_Wayne_-_J.W._Orr_lithograph.jpg" 
+                alt="PS Anthony Wayne" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+} 
+   else   if (shipName === "Robert C. Pringle") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://upload.wikimedia.org/wikipedia/commons/thumb/2/24/Chequamegon_ship_1.jpg/1920px-Chequamegon_ship_1.jpg" 
+                alt="Robert C. Pringle" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+} 
+   else   if (shipName === "Merida") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://shipwrecks.com/wp-content/uploads/2017/05/SS_Merida_photo_from_Library_of_Congress.jpg" 
+                alt="Merida" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}
+   else   if (shipName === "Madeira") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://upload.wikimedia.org/wikipedia/commons/5/52/Madeira_4.jpg" 
+                alt="Madeira" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+} 
+   else   if (shipName === "Lafayette") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://upload.wikimedia.org/wikipedia/commons/9/97/Lafayette_%281900%29.jpg" 
+                alt="Lafayette" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}
+   else   if (shipName === "USS Essex") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://upload.wikimedia.org/wikipedia/commons/thumb/e/e8/USS_Essex_%281876%29_in_1913.jpg/1280px-USS_Essex_%281876%29_in_1913.jpg" 
+                alt="USS Essex" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}
+else   if (shipName === "Erie L. Hackley") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://wisconsinshipwrecks.org/Images/ErieLHackleyWMM.jpg" 
+                alt="Erie L. Hackley" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}
+else   if (shipName === "Silver Spray") {
+    popupContent = `
+        <div style="max-width: 320px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+            <img 
+                src="https://blogger.googleusercontent.com/img/b/R29vZ2xl/AVvXsEiiFbLLHQO7hBJVAimYdgnlgvanoTwNY1dOrWzXnHdpX_2cZrW-nKlVx_BeRGcxqS6jr1YvQwpWSiSHUKKoQXL7OAJWnnoAK3sBfJFHFSjYpfmANqjDDn2_lJ0WvKLxXGldNZ_qe9hCAHw/s640/Silver+Spray+Shipwreck+01.jpg" 
+                alt="Silver Spray" 
+                style="width: 200px; height: 100px; object-fit: cover; border-radius: 4px; display: block; margin: 0 auto;"
+                onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+            <div style="display: none; padding: 10px; background: #f8f9fa; border-radius: 4px; text-align: center; color: #6c757d; font-size: 12px;">
+                Image unavailable
+            </div>
+        </div>
+    `;
+}                
+//display popups for the rest of ships with no photos attached                
+        else {
+    popupContent = `
+        <div style="max-width: 280px;">
+            <strong class="popup-title">${shipName}</strong><br>
+            <span >Year: ${sunkYear}</span><br>
+            <span >Month: ${sunkMonth}</span><br><br>
+        </div>
+    `;
+}
+
+new mapboxgl.Popup()
+    .setLngLat(coordinates)
+    .setHTML(popupContent)
+    .addTo(myMap);
+            });
+            
+            // Change the cursor to a pointer when the mouse is over the layer
+            myMap.on('mouseenter', 'Shipwrecks', function () {
+                myMap.getCanvas().style.cursor = 'pointer';
+            });
+            
+            // Change it back to a pointer when it leaves
+            myMap.on('mouseleave', 'Shipwrecks', function () {
+                myMap.getCanvas().style.cursor = '';
+            });
+    </script>
+  </body>
+</html>
